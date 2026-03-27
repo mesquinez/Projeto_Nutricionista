@@ -59,6 +59,7 @@ class AnamneseWindow(tk.Toplevel):
         row += 1
         self.objetivo_entry = ttk.Entry(scrollable_frame, width=80)
         self.objetivo_entry.grid(row=row, column=0, columnspan=2, sticky="ew", pady=2)
+        self.objetivo_entry.bind("<Return>", lambda e: self._save())
         row += 1
 
         self._create_section_title(scrollable_frame, "HISTÓRICO DE PESO", row)
@@ -66,14 +67,17 @@ class AnamneseWindow(tk.Toplevel):
         ttk.Label(scrollable_frame, text="Peso máximo (kg):").grid(row=row, column=0, sticky="w", pady=2)
         self.peso_max_entry = ttk.Entry(scrollable_frame, width=20)
         self.peso_max_entry.grid(row=row, column=1, sticky="w", pady=2)
+        self.peso_max_entry.bind("<Return>", lambda e: self._save())
         row += 1
         ttk.Label(scrollable_frame, text="Peso mínimo (kg):").grid(row=row, column=0, sticky="w", pady=2)
         self.peso_min_entry = ttk.Entry(scrollable_frame, width=20)
         self.peso_min_entry.grid(row=row, column=1, sticky="w", pady=2)
+        self.peso_min_entry.bind("<Return>", lambda e: self._save())
         row += 1
         ttk.Label(scrollable_frame, text="Peso desejado (kg):").grid(row=row, column=0, sticky="w", pady=2)
         self.peso_desejado_entry = ttk.Entry(scrollable_frame, width=20)
         self.peso_desejado_entry.grid(row=row, column=1, sticky="w", pady=2)
+        self.peso_desejado_entry.bind("<Return>", lambda e: self._save())
         row += 1
 
         self._create_section_title(scrollable_frame, "ATIVIDADE FÍSICA", row)
@@ -81,14 +85,17 @@ class AnamneseWindow(tk.Toplevel):
         ttk.Label(scrollable_frame, text="Pratica atividade física?").grid(row=row, column=0, sticky="w", pady=2)
         self.atividade_entry = ttk.Entry(scrollable_frame, width=60)
         self.atividade_entry.grid(row=row, column=1, sticky="w", pady=2)
+        self.atividade_entry.bind("<Return>", lambda e: self._save())
         row += 1
         ttk.Label(scrollable_frame, text="Frequência:").grid(row=row, column=0, sticky="w", pady=2)
         self.frequencia_entry = ttk.Entry(scrollable_frame, width=60)
         self.frequencia_entry.grid(row=row, column=1, sticky="w", pady=2)
+        self.frequencia_entry.bind("<Return>", lambda e: self._save())
         row += 1
         ttk.Label(scrollable_frame, text="Duração por sessão:").grid(row=row, column=0, sticky="w", pady=2)
         self.tempo_entry = ttk.Entry(scrollable_frame, width=60)
         self.tempo_entry.grid(row=row, column=1, sticky="w", pady=2)
+        self.tempo_entry.bind("<Return>", lambda e: self._save())
         row += 1
 
         self._create_section_title(scrollable_frame, "SONO", row)
@@ -128,6 +135,7 @@ class AnamneseWindow(tk.Toplevel):
         ttk.Label(scrollable_frame, text="Horários das refeições:").grid(row=row, column=0, sticky="w", pady=2)
         self.horarios_entry = ttk.Entry(scrollable_frame, width=60)
         self.horarios_entry.grid(row=row, column=1, sticky="w", pady=2)
+        self.horarios_entry.bind("<Return>", lambda e: self._save())
         row += 1
 
         self._create_section_title(scrollable_frame, "PREFERÊNCIAS ALIMENTARES", row)
@@ -135,14 +143,17 @@ class AnamneseWindow(tk.Toplevel):
         ttk.Label(scrollable_frame, text="Alimentos preferidos:").grid(row=row, column=0, sticky="w", pady=2)
         self.preferencias_entry = ttk.Entry(scrollable_frame, width=60)
         self.preferencias_entry.grid(row=row, column=1, sticky="w", pady=2)
+        self.preferencias_entry.bind("<Return>", lambda e: self._save())
         row += 1
         ttk.Label(scrollable_frame, text="Alimentos que não gosta:").grid(row=row, column=0, sticky="w", pady=2)
         self.aversoes_entry = ttk.Entry(scrollable_frame, width=60)
         self.aversoes_entry.grid(row=row, column=1, sticky="w", pady=2)
+        self.aversoes_entry.bind("<Return>", lambda e: self._save())
         row += 1
         ttk.Label(scrollable_frame, text="Alergias/Intolerâncias:").grid(row=row, column=0, sticky="w", pady=2)
         self.alergias_entry = ttk.Entry(scrollable_frame, width=60)
         self.alergias_entry.grid(row=row, column=1, sticky="w", pady=2)
+        self.alergias_entry.bind("<Return>", lambda e: self._save())
         row += 1
 
         self._create_section_title(scrollable_frame, "INGESTÃO DE LÍQUIDOS", row)
@@ -221,6 +232,8 @@ class AnamneseWindow(tk.Toplevel):
         ttk.Button(button_frame, text="Salvar", command=self._save).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Cancelar", command=self.destroy).pack(side=tk.LEFT, padx=5)
 
+        self.objetivo_entry.focus_set()
+
     def _create_section_title(self, parent, title: str, row: int):
         ttk.Separator(parent, orient="horizontal").grid(
             row=row, column=0, columnspan=2, sticky="ew", pady=(10, 5)
@@ -262,38 +275,39 @@ class AnamneseWindow(tk.Toplevel):
         if value:
             combo.set(value)
 
-    def _get_float(self, entry: ttk.Entry) -> Optional[float]:
-        try:
-            val = entry.get().strip()
-            return float(val) if val else None
-        except ValueError:
-            return None
 
-    def _get_int(self, combo: ttk.Combobox) -> int:
-        try:
-            val = combo.get().strip()
-            return int(val) if val else 0
-        except ValueError:
-            return 0
 
     def _save(self):
         from ..models.anamnese import Anamnese
+        from ..utils.validators import is_valid_number
+        
+        errors = []
+        if not is_valid_number(self.peso_max_entry.get().strip()):
+            errors.append("Peso Máximo deve ser um número.")
+        if not is_valid_number(self.peso_min_entry.get().strip()):
+            errors.append("Peso Mínimo deve ser um número.")
+        if not is_valid_number(self.peso_desejado_entry.get().strip()):
+            errors.append("Peso Desejado deve ser um número.")
+            
+        if errors:
+            messagebox.showerror("Erro de Formato", "\n".join(errors))
+            return
 
         anamnese = Anamnese(
             id=self.anamnese.id if self.anamnese else None,
             patient_id=self.patient.id,
-            date=date.today(),
+            date=self.anamnese.date if self.anamnese else date.today(),
             objetivo_principal=self.objetivo_entry.get().strip(),
-            peso_maximo=self._get_float(self.peso_max_entry),
-            peso_minimo=self._get_float(self.peso_min_entry),
-            peso_desejado=self._get_float(self.peso_desejado_entry),
+            peso_maximo=self.peso_max_entry.get().strip() or None,
+            peso_minimo=self.peso_min_entry.get().strip() or None,
+            peso_desejado=self.peso_desejado_entry.get().strip() or None,
             atividade_fisica=self.atividade_entry.get().strip(),
             frequencia_atividade=self.frequencia_entry.get().strip(),
             tempo_atividade=self.tempo_entry.get().strip(),
             sono_qualidade=self.sono_qualidade_entry.get().strip(),
             sono_horas=self.sono_horas_entry.get().strip(),
             habitos_alimentares=self.habitos_text.get("1.0", tk.END).strip(),
-            refeicoes_dia=self._get_int(self.refeicoes_combo),
+            refeicoes_dia=self.refeicoes_combo.get().strip() or None,
             horarios_refeicoes=self.horarios_entry.get().strip(),
             preferencia_alimentar=self.preferencias_entry.get().strip(),
             aversao_alimentar=self.aversoes_entry.get().strip(),
@@ -313,7 +327,9 @@ class AnamneseWindow(tk.Toplevel):
 
         self.result = anamnese
         if self.on_save:
-            self.on_save(anamnese)
+            success = self.on_save(anamnese)
+            if not success:
+                return # protect text fields
         self.destroy()
 
     def get_result(self) -> Optional["Anamnese"]:

@@ -44,28 +44,18 @@ class SQLiteConsultaRepository(ConsultaRepository):
             conn.commit()
 
     def _row_to_consulta(self, row: sqlite3.Row) -> Consulta:
-        def parse_time(val: Optional[str]) -> Optional[time]:
-            if val:
-                return time.fromisoformat(val)
-            return None
-
-        def parse_ts(val: Optional[str]) -> Optional[datetime]:
-            if val:
-                return datetime.fromisoformat(val.replace(" ", "T"))
-            return None
-
         return Consulta(
             id=row["id"],
             patient_id=row["patient_id"],
-            date=date.fromisoformat(row["date"]),
-            hora=parse_time(row["hora"]),
-            queixa_principal=row["queixa_principal"] or "",
-            observacoes=row["observacoes"] or "",
-            conduta=row["conduta"] or "",
-            proximo_retorno=date.fromisoformat(row["proximo_retorno"]) if row["proximo_retorno"] else None,
+            date=row["date"],
+            hora=row["hora"],
+            queixa_principal=row["queixa_principal"],
+            observacoes=row["observacoes"],
+            conduta=row["conduta"],
+            proximo_retorno=row["proximo_retorno"],
             peso_registrado=row["peso_registrado"],
-            created_at=parse_ts(row["created_at"]),
-            updated_at=parse_ts(row["updated_at"]),
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
         )
 
     def add(self, consulta: Consulta) -> int:

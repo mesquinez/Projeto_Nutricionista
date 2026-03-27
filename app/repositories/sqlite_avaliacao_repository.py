@@ -57,15 +57,10 @@ class SQLiteAvaliacaoRepository(AvaliacaoRepository):
             conn.commit()
 
     def _row_to_avaliacao(self, row: sqlite3.Row) -> Avaliacao:
-        def parse_ts(val: Optional[str]) -> Optional[datetime]:
-            if val:
-                return datetime.fromisoformat(val.replace(" ", "T"))
-            return None
-
         return Avaliacao(
             id=row["id"],
             patient_id=row["patient_id"],
-            date=date.fromisoformat(row["date"]),
+            date=row["date"],
             peso=row["peso"],
             altura=row["altura"],
             cintura=row["cintura"],
@@ -84,9 +79,9 @@ class SQLiteAvaliacaoRepository(AvaliacaoRepository):
             pressao_sistolica=row["pressao_sistolica"],
             pressao_diastolica=row["pressao_diastolica"],
             frequencia_cardiaca=row["frequencia_cardiaca"],
-            observacoes=row["observacoes"] or "",
-            created_at=parse_ts(row["created_at"]),
-            updated_at=parse_ts(row["updated_at"]),
+            observacoes=row["observacoes"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
         )
 
     def add(self, avaliacao: Avaliacao) -> int:

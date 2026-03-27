@@ -49,28 +49,23 @@ class SQLitePlanoAlimentarRepository(PlanoAlimentarRepository):
             conn.commit()
 
     def _row_to_plano(self, row: sqlite3.Row) -> PlanoAlimentar:
-        def parse_ts(val: Optional[str]) -> Optional[datetime]:
-            if val:
-                return datetime.fromisoformat(val.replace(" ", "T"))
-            return None
-
         return PlanoAlimentar(
             id=row["id"],
             patient_id=row["patient_id"],
-            date=date.fromisoformat(row["date"]),
-            cafe_manha=row["cafe_manha"] or "",
-            lanche_manha=row["lanche_manha"] or "",
-            almoco=row["almoco"] or "",
-            lanche_tarde=row["lanche_tarde"] or "",
-            jantar=row["jantar"] or "",
-            lanche_noite=row["lanche_noite"] or "",
-            observacoes=row["observacoes"] or "",
+            date=row["date"],
+            cafe_manha=row["cafe_manha"],
+            lanche_manha=row["lanche_manha"],
+            almoco=row["almoco"],
+            lanche_tarde=row["lanche_tarde"],
+            jantar=row["jantar"],
+            lanche_noite=row["lanche_noite"],
+            observacoes=row["observacoes"],
             calorias=row["calorias"],
             proteinas=row["proteinas"],
             carboidratos=row["carboidratos"],
             gorduras=row["gorduras"],
-            created_at=parse_ts(row["created_at"]),
-            updated_at=parse_ts(row["updated_at"]),
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
         )
 
     def add(self, plano: PlanoAlimentar) -> int:

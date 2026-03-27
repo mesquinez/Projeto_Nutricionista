@@ -80,6 +80,7 @@ class TestPatientServiceValidation:
             "(11)99999-9999",
             "(21)98765-4321",
             "(31)12345-6789",
+            "(11)8888-8888",
         ]
         for phone in valid_phones:
             patient = Patient(
@@ -134,12 +135,15 @@ class TestPatientServiceValidation:
         assert any(e.field == "birth_date" for e in result.errors)
 
     def test_optional_fields_can_be_empty(self, patient_service):
+        # Desde a refatoração, apenas email é opcional.
+        # Telefone e data de nascimento são agora obrigatórios.
+        # Este teste valida que e-mail vazio passa sem erro.
         patient = Patient(
             id=1,
             name="João Silva",
-            phone="",
-            email="",
-            birth_date=None,
+            phone="(21)99700-9999",
+            email="",            # opcional
+            birth_date=date(1990, 1, 15),
         )
         result = patient_service.validate(patient)
         assert result.success is True
@@ -166,7 +170,7 @@ class TestPatientServiceCRUD:
         with pytest.raises(ValueError) as exc_info:
             patient_service.create(patient)
 
-        assert "nome é obrigatório" in str(exc_info.value)
+        assert "nome completo" in str(exc_info.value).lower()
         mock_repository.add.assert_not_called()
 
     def test_update_patient_success(self, patient_service, mock_repository, valid_patient):
@@ -285,3 +289,13 @@ class TestValidationResult:
         assert len(result.error_messages) == 2
         assert "Nome é obrigatório" in result.error_messages
         assert "Email inválido" in result.error_messages
+
+    def test_defensive_patient_loading(self):
+        patient = Patient(id='lixo', name=None, phone='vazio', email=None, birth_date='datazoada', created_at='tempozoado', updated_at=None)
+        assert patient.id is None
+        assert patient.name == ''
+        assert patient.phone == 'vazio'
+        assert patient.email == ''
+        assert patient.birth_date is None
+        assert patient.created_at is None
+        assert patient.updated_at is None

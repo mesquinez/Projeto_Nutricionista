@@ -36,6 +36,32 @@ class Avaliacao:
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
+    def __post_init__(self):
+        from ..utils.converters import (
+            coerce_int, coerce_float, coerce_string,
+            coerce_date_or_today, coerce_datetime
+        )
+
+        self.patient_id = coerce_int(self.patient_id) or 0
+        self.date = coerce_date_or_today(self.date)
+
+        float_fields = [
+            "peso", "altura", "cintura", "quadril", "bracodireito", "bracoesquedo", 
+            "coxa", "panturrilha", "pescoco", "dobra_triceps", "dobra_biceps", 
+            "dobra_subscapular", "dobra_suprailiaca", "dobra_abdominal", "dobra_coxa"
+        ]
+        for field_name in float_fields:
+            setattr(self, field_name, coerce_float(getattr(self, field_name)))
+
+        int_fields = ["pressao_sistolica", "pressao_diastolica", "frequencia_cardiaca"]
+        for field_name in int_fields:
+            setattr(self, field_name, coerce_int(getattr(self, field_name)))
+
+        self.observacoes = coerce_string(self.observacoes)
+        self.id = coerce_int(self.id)
+        self.created_at = coerce_datetime(self.created_at)
+        self.updated_at = coerce_datetime(self.updated_at)
+
     def calcular_imc(self) -> Optional[float]:
         if self.peso and self.altura and self.altura > 0:
             altura_m = self.altura / 100
@@ -51,7 +77,7 @@ class Avaliacao:
         return {
             'id': self.id,
             'patient_id': self.patient_id,
-            'date': self.date.isoformat() if self.date else None,
+            'date': self.date.isoformat() if isinstance(self.date, date) else None,
             'peso': self.peso,
             'altura': self.altura,
             'cintura': self.cintura,
@@ -71,6 +97,6 @@ class Avaliacao:
             'pressao_diastolica': self.pressao_diastolica,
             'frequencia_cardiaca': self.frequencia_cardiaca,
             'observacoes': self.observacoes,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'created_at': self.created_at.isoformat() if isinstance(self.created_at, datetime) else None,
+            'updated_at': self.updated_at.isoformat() if isinstance(self.updated_at, datetime) else None,
         }

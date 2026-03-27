@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
+from copy import deepcopy
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -39,32 +40,39 @@ class PatientDetailWindow(tk.Toplevel):
         self._load_data()
 
     def _create_widgets(self):
-        notebook = ttk.Notebook(self)
-        notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        self.notebook = ttk.Notebook(self)
+        self.notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
-        self.tab_consultas = ttk.Frame(notebook)
-        self.tab_avaliacoes = ttk.Frame(notebook)
-        self.tab_planos = ttk.Frame(notebook)
-        self.tab_resumo = ttk.Frame(notebook)
+        self.tab_consultas = ttk.Frame(self.notebook)
+        self.tab_avaliacoes = ttk.Frame(self.notebook)
+        self.tab_planos = ttk.Frame(self.notebook)
+        self.tab_resumo = ttk.Frame(self.notebook)
 
-        notebook.add(self.tab_consultas, text="📅 Consultas")
-        notebook.add(self.tab_avaliacoes, text="📏 Avaliações")
-        notebook.add(self.tab_planos, text="🍽️ Planos")
-        notebook.add(self.tab_resumo, text="📊 Resumo")
+        self.notebook.add(self.tab_consultas, text="📅 Consultas")
+        self.notebook.add(self.tab_avaliacoes, text="📏 Avaliações")
+        self.notebook.add(self.tab_planos, text="🍽️ Planos")
+        self.notebook.add(self.tab_resumo, text="📊 Resumo")
 
         self._create_consultas_tab()
         self._create_avaliacoes_tab()
         self._create_planos_tab()
         self._create_resumo_tab()
-
-        ttk.Frame(self).pack(fill=tk.X, padx=10, pady=5)
-        ttk.Button(self, text="Fechar", command=self.destroy).pack(pady=10)
+        
+        button_bar = ttk.Frame(self)
+        button_bar.pack(fill=tk.X, padx=10, pady=5)
+        
+        ttk.Button(button_bar, text="📋 Anamnese", command=self._abrir_anamnese).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_bar, text="Fechar", command=self.destroy).pack(side=tk.RIGHT, padx=5)
 
     def _create_consultas_tab(self):
         frame = ttk.Frame(self.tab_consultas, padding="10")
         frame.pack(fill=tk.BOTH, expand=True)
 
-        ttk.Button(frame, text="+ Nova Consulta", command=self._nova_consulta).pack(anchor="w", pady=5)
+        btn_frame = ttk.Frame(frame)
+        btn_frame.pack(anchor="w", pady=5)
+        ttk.Button(btn_frame, text="+ Nova Consulta", command=self._nova_consulta).pack(side=tk.LEFT, padx=2)
+        ttk.Button(btn_frame, text="✏️ Editar Selecionada", command=self._editar_consulta).pack(side=tk.LEFT, padx=2)
+        ttk.Button(btn_frame, text="🗑️ Excluir Selecionada", command=self._excluir_consulta).pack(side=tk.LEFT, padx=2)
 
         cols = ("date", "queixa", "conduta", "peso")
         self.consultas_tree = ttk.Treeview(frame, columns=cols, show="headings", height=15)
@@ -91,7 +99,11 @@ class PatientDetailWindow(tk.Toplevel):
         frame = ttk.Frame(self.tab_avaliacoes, padding="10")
         frame.pack(fill=tk.BOTH, expand=True)
 
-        ttk.Button(frame, text="+ Nova Avaliação", command=self._nova_avaliacao).pack(anchor="w", pady=5)
+        btn_frame = ttk.Frame(frame)
+        btn_frame.pack(anchor="w", pady=5)
+        ttk.Button(btn_frame, text="+ Nova Avaliação", command=self._nova_avaliacao).pack(side=tk.LEFT, padx=2)
+        ttk.Button(btn_frame, text="✏️ Editar Selecionada", command=self._editar_avaliacao).pack(side=tk.LEFT, padx=2)
+        ttk.Button(btn_frame, text="🗑️ Excluir Selecionada", command=self._excluir_avaliacao).pack(side=tk.LEFT, padx=2)
 
         cols = ("date", "peso", "altura", "imc", "cintura", "quadril")
         self.avaliacoes_tree = ttk.Treeview(frame, columns=cols, show="headings", height=15)
@@ -118,7 +130,11 @@ class PatientDetailWindow(tk.Toplevel):
         frame = ttk.Frame(self.tab_planos, padding="10")
         frame.pack(fill=tk.BOTH, expand=True)
 
-        ttk.Button(frame, text="+ Novo Plano", command=self._novo_plano).pack(anchor="w", pady=5)
+        btn_frame = ttk.Frame(frame)
+        btn_frame.pack(anchor="w", pady=5)
+        ttk.Button(btn_frame, text="+ Novo Plano", command=self._novo_plano).pack(side=tk.LEFT, padx=2)
+        ttk.Button(btn_frame, text="✏️ Editar Selecionado", command=self._editar_plano).pack(side=tk.LEFT, padx=2)
+        ttk.Button(btn_frame, text="🗑️ Excluir Selecionado", command=self._excluir_plano).pack(side=tk.LEFT, padx=2)
 
         cols = ("date", "calorias", "proteinas", "carboidratos", "gorduras")
         self.planos_tree = ttk.Treeview(frame, columns=cols, show="headings", height=15)
@@ -199,14 +215,13 @@ class PatientDetailWindow(tk.Toplevel):
             ))
 
     def _load_resumo(self):
+        self.resumo_text.config(state="normal")
         self.resumo_text.delete("1.0", tk.END)
 
         anamnese = self.anamnese_controller.get_patient_anamnese(self.patient.id)
         consultas = self.consulta_controller.get_by_patient(self.patient.id)
         avaliacoes = self.avaliacao_controller.get_by_patient(self.patient.id)
         planos = self.plano_controller.get_by_patient(self.patient.id)
-
-        ultima_avaliacao = avaliacoes[0] if avaliacoes else None
 
         texto = f"""
 ═══════════════════════════════════════════════════════════════
@@ -234,9 +249,10 @@ Alergias/Intolerâncias: {anamnese.alergio_intolerancias or '-'}
 
 """
         else:
-            texto += "\nANAMNESE: Não realizada\n\n"
+            texto += "ANAMNESE: Não realizada\n\n"
 
-        if ultima_avaliacao:
+        if avaliacoes:
+            ultima_avaliacao = avaliacoes[0]
             imc = ultima_avaliacao.calcular_imc()
             texto += f"""
 ÚLTIMA AVALIAÇÃO ({ultima_avaliacao.date.strftime('%d/%m/%Y')})
@@ -248,10 +264,16 @@ Cintura: {ultima_avaliacao.cintura or '-'} cm
 Quadril: {ultima_avaliacao.quadril or '-'} cm
 PA: {ultima_avaliacao.pressao_sistolica or '-'}/{ultima_avaliacao.pressao_diastolica or '-'}
 FC: {ultima_avaliacao.frequencia_cardiaca or '-'} bpm
-
 """
+            if len(avaliacoes) > 1:
+                primeira = avaliacoes[-1]
+                if primeira.peso and ultima_avaliacao.peso:
+                    diff = ultima_avaliacao.peso - primeira.peso
+                    sinal = "+" if diff > 0 else ""
+                    texto += f"Evolução total: {sinal}{diff:.1f} kg (desde {primeira.date.strftime('%d/%m/%Y')})\n"
+            texto += "\n"
         else:
-            texto += "\nAVALIAÇÕES: Nenhuma registrada\n\n"
+            texto += "AVALIAÇÕES: Nenhuma registrada\n\n"
 
         if consultas:
             ultima_consulta = consultas[0]
@@ -260,6 +282,18 @@ FC: {ultima_avaliacao.frequencia_cardiaca or '-'} bpm
 ───────────────
 Queixa: {ultima_consulta.queixa_principal or '-'}
 Próximo retorno: {ultima_consulta.proximo_retorno.strftime('%d/%m/%Y') if ultima_consulta.proximo_retorno else 'Não agendado'}
+
+"""
+        else:
+            texto += "CONSULTAS: Nenhuma registrada\n\n"
+
+        if planos:
+            p = planos[0]
+            texto += f"""
+PLANO ATUAL ({p.date.strftime('%d/%m/%Y')})
+───────────────
+Macros: {p.calorias or '-'} kcal (P: {p.proteinas or '-'}g, C: {p.carboidratos or '-'}g, G: {p.gorduras or '-'}g)
+Obs: {(p.observacoes[:60] + '...') if p.observacoes and len(p.observacoes) > 60 else p.observacoes or '-'}
 
 """
 
@@ -273,6 +307,26 @@ Total de planos: {len(planos)}
 ═══════════════════════════════════════════════════════════════
 """
         self.resumo_text.insert("1.0", texto)
+        self.resumo_text.config(state="disabled")
+
+    def _abrir_anamnese(self):
+        existing = self.anamnese_controller.get_patient_anamnese(self.patient.id)
+
+        def on_save(anamnese):
+            try:
+                if existing:
+                    self.anamnese_controller.update_anamnese(anamnese)
+                else:
+                    self.anamnese_controller.create_anamnese(anamnese)
+                self._load_resumo()
+                messagebox.showinfo("Sucesso", "Anamnese salva!")
+                return True
+            except Exception as e:
+                messagebox.showerror("Erro", str(e))
+                return False
+
+        from .anamnese_window import AnamneseWindow
+        AnamneseWindow(self, patient=self.patient, anamnese=existing, on_save=on_save)
 
     def _nova_consulta(self):
         def on_save(consulta):
@@ -281,8 +335,10 @@ Total de planos: {len(planos)}
                 self._load_consultas()
                 self._load_resumo()
                 messagebox.showinfo("Sucesso", "Consulta registrada!")
+                return True
             except Exception as e:
                 messagebox.showerror("Erro", str(e))
+                return False
 
         from .consulta_window import ConsultaWindow
         ConsultaWindow(self, self.patient, on_save=on_save)
@@ -299,8 +355,10 @@ Total de planos: {len(planos)}
                 self._load_consultas()
                 self._load_resumo()
                 messagebox.showinfo("Sucesso", "Consulta atualizada!")
+                return True
             except Exception as e:
                 messagebox.showerror("Erro", str(e))
+                return False
 
         from .consulta_window import ConsultaWindow
         ConsultaWindow(self, self.patient, consulta=consulta, on_save=on_save)
@@ -312,8 +370,10 @@ Total de planos: {len(planos)}
                 self._load_avaliacoes()
                 self._load_resumo()
                 messagebox.showinfo("Sucesso", "Avaliação registrada!")
+                return True
             except Exception as e:
                 messagebox.showerror("Erro", str(e))
+                return False
 
         from .avaliacao_window import AvaliacaoWindow
         AvaliacaoWindow(self, self.patient, on_save=on_save)
@@ -330,23 +390,38 @@ Total de planos: {len(planos)}
                 self._load_avaliacoes()
                 self._load_resumo()
                 messagebox.showinfo("Sucesso", "Avaliação atualizada!")
+                return True
             except Exception as e:
                 messagebox.showerror("Erro", str(e))
+                return False
 
         from .avaliacao_window import AvaliacaoWindow
         AvaliacaoWindow(self, self.patient, avaliacao=avaliacao, on_save=on_save)
 
     def _novo_plano(self):
+        last_plano = self.plano_controller.get_last(self.patient.id)
+        plano_to_pass = None
+        
+        if last_plano:
+            if messagebox.askyesno("Novo Plano", "Deseja carregar os dados do último plano como base para este novo?"):
+                plano_to_pass = deepcopy(last_plano)
+                plano_to_pass.id = None
+                from datetime import date
+                plano_to_pass.date = date.today()
+
         def on_save(plano):
             try:
                 self.plano_controller.create(plano)
                 self._load_planos()
+                self._load_resumo()
                 messagebox.showinfo("Sucesso", "Plano registrado!")
+                return True
             except Exception as e:
                 messagebox.showerror("Erro", str(e))
+                return False
 
         from .plano_alimentar_window import PlanoAlimentarWindow
-        PlanoAlimentarWindow(self, self.patient, on_save=on_save)
+        PlanoAlimentarWindow(self, self.patient, plano=plano_to_pass, on_save=on_save)
 
     def _editar_plano(self):
         selection = self.planos_tree.selection()
@@ -358,9 +433,51 @@ Total de planos: {len(planos)}
             try:
                 self.plano_controller.update(p)
                 self._load_planos()
+                self._load_resumo()
                 messagebox.showinfo("Sucesso", "Plano atualizado!")
+                return True
             except Exception as e:
                 messagebox.showerror("Erro", str(e))
+                return False
 
         from .plano_alimentar_window import PlanoAlimentarWindow
         PlanoAlimentarWindow(self, self.patient, plano=plano, on_save=on_save)
+
+    def _excluir_consulta(self):
+        selection = self.consultas_tree.selection()
+        if not selection:
+            return
+        if messagebox.askyesno("Confirmar", "Deseja realmente excluir esta consulta?"):
+            try:
+                self.consulta_controller.delete(int(selection[0]))
+                self._load_consultas()
+                self._load_resumo()
+                messagebox.showinfo("Sucesso", "Consulta excluída.")
+            except Exception as e:
+                messagebox.showerror("Erro", str(e))
+
+    def _excluir_avaliacao(self):
+        selection = self.avaliacoes_tree.selection()
+        if not selection:
+            return
+        if messagebox.askyesno("Confirmar", "Deseja realmente excluir esta avaliação?"):
+            try:
+                self.avaliacao_controller.delete(int(selection[0]))
+                self._load_avaliacoes()
+                self._load_resumo()
+                messagebox.showinfo("Sucesso", "Avaliação excluída.")
+            except Exception as e:
+                messagebox.showerror("Erro", str(e))
+
+    def _excluir_plano(self):
+        selection = self.planos_tree.selection()
+        if not selection:
+            return
+        if messagebox.askyesno("Confirmar", "Deseja realmente excluir este plano alimentar?"):
+            try:
+                self.plano_controller.delete(int(selection[0]))
+                self._load_planos()
+                self._load_resumo()
+                messagebox.showinfo("Sucesso", "Plano excluído.")
+            except Exception as e:
+                messagebox.showerror("Erro", str(e))

@@ -49,11 +49,41 @@ class Anamnese:
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
+    def __post_init__(self):
+        from ..utils.converters import (
+            coerce_int, coerce_float, coerce_string,
+            coerce_date_or_today, coerce_datetime
+        )
+
+        self.patient_id = coerce_int(self.patient_id) or 0
+        self.date = coerce_date_or_today(self.date)
+
+        for field_name in ["peso_maximo", "peso_minimo", "peso_desejado"]:
+            setattr(self, field_name, coerce_float(getattr(self, field_name)))
+            
+        self.refeicoes_dia = coerce_int(self.refeicoes_dia) or 0
+
+        str_fields = [
+            "objetivo_principal", "historico_peso", "atividade_fisica", 
+            "frequencia_atividade", "tempo_atividade", "sono_qualidade", "sono_horas",
+            "habitos_alimentares", "horarios_refeicoes", "preferencia_alimentar", 
+            "aversao_alimentar", "alergio_intolerancias", "consumo_agua", 
+            "consumo_alcool", "consumo_cigarro", "doencas_previas", "doencas_familiares", 
+            "medicamentos", "suplementacao", "cirurgias", "internacoes", 
+            "ritmo_intestinal", "observacoes_gerais"
+        ]
+        for field_name in str_fields:
+            setattr(self, field_name, coerce_string(getattr(self, field_name)))
+
+        self.id = coerce_int(self.id)
+        self.created_at = coerce_datetime(self.created_at)
+        self.updated_at = coerce_datetime(self.updated_at)
+
     def to_dict(self):
         return {
             'id': self.id,
             'patient_id': self.patient_id,
-            'date': self.date.isoformat() if self.date else None,
+            'date': self.date.isoformat() if isinstance(self.date, date) else None,
             'objetivo_principal': self.objetivo_principal,
             'peso_maximo': self.peso_maximo,
             'peso_minimo': self.peso_minimo,
@@ -80,6 +110,6 @@ class Anamnese:
             'internacoes': self.internacoes,
             'ritmo_intestinal': self.ritmo_intestinal,
             'observacoes_gerais': self.observacoes_gerais,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'created_at': self.created_at.isoformat() if isinstance(self.created_at, datetime) else None,
+            'updated_at': self.updated_at.isoformat() if isinstance(self.updated_at, datetime) else None,
         }

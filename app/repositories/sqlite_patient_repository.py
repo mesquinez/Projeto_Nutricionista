@@ -10,7 +10,11 @@ from .patient_repository import PatientRepository
 
 
 class SQLitePatientRepository(PatientRepository):
-    COLUMNS = ["id", "name", "phone", "email", "birth_date", "created_at", "updated_at"]
+    COLUMNS = [
+        "id", "name", "social_name", "phone", "email", "birth_date", 
+        "city", "uf", "profession", "observations", 
+        "legal_guardian", "guardian_phone", "status", "created_at", "updated_at"
+    ]
 
     def __init__(self, db_path: Path | str = "nutritionist.db"):
         self.db_path = Path(db_path)
@@ -33,61 +37,70 @@ class SQLitePatientRepository(PatientRepository):
                 CREATE TABLE IF NOT EXISTS patients (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT NOT NULL,
-                    phone TEXT,
+                    social_name TEXT,
+                    phone TEXT NOT NULL,
                     email TEXT,
-                    birth_date TEXT,
+                    birth_date TEXT NOT NULL,
+                    city TEXT,
+                    uf TEXT,
+                    profession TEXT,
+                    observations TEXT,
+                    legal_guardian TEXT,
+                    guardian_phone TEXT,
+                    status TEXT DEFAULT 'Ativo',
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
                 )
                 """
             )
             conn.commit()
-            self._migrate_legacy_columns(cursor)
+            self._migrate_schema(cursor)
 
-    def _migrate_legacy_columns(self, cursor: sqlite3.Cursor):
+    def _migrate_schema(self, cursor: sqlite3.Cursor):
         cursor.execute("PRAGMA table_info(patients)")
         columns = [row[1] for row in cursor.fetchall()]
-        if "cpf" not in columns and "address" not in columns:
-            return
-
-        cursor.execute(
-            f"""
-            CREATE TABLE IF NOT EXISTS patients_new (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                phone TEXT,
-                email TEXT,
-                birth_date TEXT,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-            )
-            """
-        )
-        cursor.execute(
-            f"""
-            INSERT INTO patients_new ({", ".join(self.COLUMNS)})
-            SELECT {", ".join(self.COLUMNS)} FROM patients
-            """
-        )
-        cursor.execute("DROP TABLE patients")
-        cursor.execute("ALTER TABLE patients_new RENAME TO patients")
-        conn = cursor.connection
-        conn.commit()
-        logger.info("Migração de colunas legadas (cpf, address) concluída")
+        
+        needed = [
+            ("social_name", "TEXT"),
+            ("city", "TEXT"),
+            ("uf", "TEXT"),
+            ("profession", "TEXT"),
+            ("observations", "TEXT"),
+            ("legal_guardian", "TEXT"),
+            ("guardian_phone", "TEXT"),
+            ("status", "TEXT DEFAULT 'Ativo'")
+        ]
+        
+        for col_name, col_type in needed:
+            if col_name not in columns:
+                cursor.execute(f"ALTER TABLE patients ADD COLUMN {col_name} {col_type}")
+                logger.info(f"Coluna {col_name} adicionada à tabela patients")
 
     def add(self, patient: Patient) -> int:
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
-                INSERT INTO patients (name, phone, email, birth_date)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO patients (
+                    name, social_name, phone, email, birth_date, 
+                    city, uf, profession, observations, 
+                    legal_guardian, guardian_phone, status
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     patient.name,
+                    patient.social_name,
                     patient.phone,
                     patient.email,
                     patient.birth_date.isoformat() if patient.birth_date else None,
+                    patient.city,
+                    patient.uf,
+                    patient.profession,
+                    patient.observations,
+                    patient.legal_guardian,
+                    patient.guardian_phone,
+                    patient.status,
                 ),
             )
             conn.commit()
@@ -101,14 +114,25 @@ class SQLitePatientRepository(PatientRepository):
             cursor.execute(
                 """
                 UPDATE patients
-                SET name = ?, phone = ?, email = ?, birth_date = ?, updated_at = CURRENT_TIMESTAMP
+                SET name = ?, social_name = ?, phone = ?, email = ?, birth_date = ?, 
+                    city = ?, uf = ?, profession = ?, observations = ?, 
+                    legal_guardian = ?, guardian_phone = ?, status = ?, 
+                    updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
                 """,
                 (
                     patient.name,
+                    patient.social_name,
                     patient.phone,
                     patient.email,
                     patient.birth_date.isoformat() if patient.birth_date else None,
+                    patient.city,
+                    patient.uf,
+                    patient.profession,
+                    patient.observations,
+                    patient.legal_guardian,
+                    patient.guardian_phone,
+                    patient.status,
                     patient.id,
                 ),
             )
@@ -148,29 +172,29 @@ class SQLitePatientRepository(PatientRepository):
             cursor.execute(
                 """
                 SELECT * FROM patients
-                WHERE name LIKE ? OR email LIKE ? OR phone LIKE ?
+                WHERE name LIKE ? OR email LIKE ? OR phone LIKE ? OR social_name LIKE ?
                 ORDER BY name
                 """,
-                (f"%{query}%", f"%{query}%", f"%{query}%"),
+                (f"%{query}%", f"%{query}%", f"%{query}%", f"%{query}%"),
             )
             rows = cursor.fetchall()
             return [self._row_to_patient(row) for row in rows]
 
     def _row_to_patient(self, row: sqlite3.Row) -> Patient:
-        birth_str = row["birth_date"]
-        birth_date_val: Optional[date] = date.fromisoformat(birth_str) if birth_str else None
-
-        def parse_timestamp(value: Optional[str]) -> Optional[datetime]:
-            if not value:
-                return None
-            return datetime.fromisoformat(value.replace(" ", "T"))
-
         return Patient(
             id=row["id"],
             name=row["name"],
-            phone=row["phone"] or "",
-            email=row["email"] or "",
-            birth_date=birth_date_val,
-            created_at=parse_timestamp(row["created_at"]),
-            updated_at=parse_timestamp(row["updated_at"]),
+            social_name=row["social_name"],
+            phone=row["phone"],
+            email=row["email"],
+            birth_date=row["birth_date"],
+            city=row["city"],
+            uf=row["uf"],
+            profession=row["profession"],
+            observations=row["observations"],
+            legal_guardian=row["legal_guardian"],
+            guardian_phone=row["guardian_phone"],
+            status=row["status"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
         )

@@ -7,6 +7,8 @@ if TYPE_CHECKING:
     from ..models.patient import Patient
     from ..models.plano_alimentar import PlanoAlimentar
 
+from app.ui.utils.formatters import format_date_br
+
 try:
     from tkcalendar import DateEntry
     HAS_TKCALENDAR = True
@@ -53,6 +55,9 @@ class PlanoAlimentarWindow(tk.Toplevel):
         else:
             self.date_entry = ttk.Entry(frame, width=35)
             self.date_entry.grid(row=row, column=0, columnspan=2, sticky="w", pady=5)
+            ttk.Label(frame, text="(DD/MM/AAAA)").grid(row=row, column=2, sticky="w", padx=5)
+            self.date_entry.bind("<KeyRelease>", self._on_date_change)
+            self.date_entry.bind("<Return>", lambda e: self.cafe_manha_text.focus_set())
         row += 1
 
         refeicoes = [
@@ -90,6 +95,7 @@ class PlanoAlimentarWindow(tk.Toplevel):
             ttk.Label(frame, text=label).grid(row=row, column=col, sticky="w", pady=3)
             entry = ttk.Entry(frame, width=15)
             entry.grid(row=row, column=col+1, sticky="w", pady=3)
+            entry.bind("<Return>", lambda e: self._save())
             setattr(self, attr, entry)
         row += 1
 
@@ -103,6 +109,11 @@ class PlanoAlimentarWindow(tk.Toplevel):
         button_frame.grid(row=row, column=0, columnspan=2, pady=20)
         ttk.Button(button_frame, text="Salvar", command=self._save).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Cancelar", command=self.destroy).pack(side=tk.LEFT, padx=5)
+
+        if HAS_TKCALENDAR:
+            self.date_picker.focus_set()
+        else:
+            self.date_entry.focus_set()
 
     def _load_plano_data(self):
         p = self.plano
@@ -119,32 +130,49 @@ class PlanoAlimentarWindow(tk.Toplevel):
         self.lanche_noite_text.insert("1.0", p.lanche_noite or "")
         self.observacoes_text.insert("1.0", p.observacoes or "")
         
-        if p.calorias:
+        if p.calorias is not None:
             self.calorias_entry.insert(0, str(p.calorias))
-        if p.proteinas:
+        if p.proteinas is not None:
             self.proteinas_entry.insert(0, str(p.proteinas))
-        if p.carboidratos:
+        if p.carboidratos is not None:
             self.carboidratos_entry.insert(0, str(p.carboidratos))
-        if p.gorduras:
+        if p.gorduras is not None:
             self.gorduras_entry.insert(0, str(p.gorduras))
 
-    def _get_float(self, entry: ttk.Entry) -> Optional[float]:
-        try:
-            val = entry.get().strip()
-            return float(val) if val else None
-        except ValueError:
-            return None
+    def _on_date_change(self, event=None):
+        if not HAS_TKCALENDAR:
+            formatted = format_date_br(self.date_entry.get())
+            current_pos = self.date_entry.index(tk.INSERT)
+            self.date_entry.delete(0, tk.END)
+            self.date_entry.insert(0, formatted)
+            self.date_entry.icursor(current_pos)
 
-    def _get_int(self, entry: ttk.Entry) -> Optional[int]:
-        try:
-            val = entry.get().strip()
-            return int(val) if val else None
-        except ValueError:
-            return None
+
 
     def _save(self):
         from ..models.plano_alimentar import PlanoAlimentar
+        from ..utils.validators import is_valid_number, is_valid_int
+        from ..utils.converters import coerce_date_or_none
         
+        errors = []
+        if not is_valid_int(self.calorias_entry.get().strip()):
+            errors.append("Calorias (kcal) deve ser um número inteiro.")
+        if not is_valid_number(self.proteinas_entry.get().strip()):
+            errors.append("Proteínas (g) deve ser um número.")
+        if not is_valid_number(self.carboidratos_entry.get().strip()):
+            errors.append("Carboidratos (g) deve ser um número.")
+        if not is_valid_number(self.gorduras_entry.get().strip()):
+            errors.append("Gorduras (g) deve ser um número.")
+            
+        if not HAS_TKCALENDAR:
+            d_txt = self.date_entry.get().strip()
+            if d_txt and not coerce_date_or_none(d_txt):
+                errors.append("Formato de data inválido (use AAAA-MM-DD).")
+
+        if errors:
+            messagebox.showerror("Erro de Preenchimento", "\n".join(errors))
+            return
+
         plano = PlanoAlimentar(
             id=self.plano.id if self.plano else None,
             patient_id=self.patient.id,
@@ -156,20 +184,30 @@ class PlanoAlimentarWindow(tk.Toplevel):
             jantar=self.jantar_text.get("1.0", tk.END).strip(),
             lanche_noite=self.lanche_noite_text.get("1.0", tk.END).strip(),
             observacoes=self.observacoes_text.get("1.0", tk.END).strip(),
-            calorias=self._get_int(self.calorias_entry),
-            proteinas=self._get_float(self.proteinas_entry),
-            carboidratos=self._get_float(self.carboidratos_entry),
-            gorduras=self._get_float(self.gorduras_entry),
+            calorias=self.calorias_entry.get().strip() or None,
+            proteinas=self.proteinas_entry.get().strip() or None,
+            carboidratos=self.carboidratos_entry.get().strip() or None,
+            gorduras=self.gorduras_entry.get().strip() or None,
         )
 
         if self.on_save:
-            self.on_save(plano)
+            success = self.on_save(plano)
+            if not success:
+               return # abort window murder
         self.destroy()
 
     def _get_date(self) -> date:
+        from ..utils.converters import coerce_date_or_today
         if HAS_TKCALENDAR:
             d = self.date_picker.get_date()
             return d if isinstance(d, date) else date.today()
         else:
             d = self.date_entry.get().strip()
-            return date.fromisoformat(d) if d else date.today()
+            # Suporte a DD/MM/AAAA
+            from ..utils.converters import coerce_date_or_today
+            if "/" in d:
+                try:
+                    parts = d.split("/")
+                    d = f"{parts[2]}-{parts[1]}-{parts[0]}"
+                except: pass
+            return coerce_date_or_today(d)
