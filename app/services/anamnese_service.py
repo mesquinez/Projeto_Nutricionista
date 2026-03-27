@@ -1,10 +1,9 @@
-from datetime import date
 from typing import List, Optional
 
 from ..config import logger
 from ..models.anamnese import Anamnese
 from ..repositories.anamnese_repository import AnamneseRepository
-from ..utils.validation import ValidationResult, ValidationError
+from ..utils.validation import ValidationError, ValidationResult
 
 
 class AnamneseService:
@@ -12,29 +11,20 @@ class AnamneseService:
         self.repository = repository
 
     def validate(self, anamnese: Anamnese) -> ValidationResult:
-        errors = []
+        errors: List[ValidationError] = []
+
         if not anamnese.patient_id or anamnese.patient_id <= 0:
             errors.append(ValidationError("patient_id", "Paciente não identificado."))
-            
-        if not anamnese.objetivo_principal:
-            errors.append(ValidationError("objetivo_principal", "O objetivo principal da anamnese é obrigatório."))
 
-        if anamnese.peso_maximo is not None and anamnese.peso_maximo <= 0:
-            errors.append(ValidationError("peso_maximo", "Peso máximo não pode ser negativo ou zero."))
-        if anamnese.peso_minimo is not None and anamnese.peso_minimo <= 0:
-            errors.append(ValidationError("peso_minimo", "Peso mínimo não pode ser negativo ou zero."))
-        if anamnese.peso_desejado is not None and anamnese.peso_desejado <= 0:
-            errors.append(ValidationError("peso_desejado", "Peso desejado não pode ser negativo ou zero."))
+        if not anamnese.data:
+            errors.append(ValidationError("data", "A data da anamnese é obrigatória."))
 
-        if (anamnese.peso_maximo and anamnese.peso_minimo) and (anamnese.peso_minimo > anamnese.peso_maximo):
-            errors.append(ValidationError("peso_minimo", "O peso mínimo informado é maior que o peso máximo."))
+        if not anamnese.queixa_principal or not anamnese.queixa_principal.strip():
+            errors.append(ValidationError("queixa_principal", "A queixa principal é obrigatória."))
 
         return ValidationResult(success=len(errors) == 0, errors=errors)
 
     def create(self, anamnese: Anamnese) -> Anamnese:
-        if not anamnese.date:
-            anamnese.date = date.today()
-
         result = self.validate(anamnese)
         if not result.success:
             raise ValueError("; ".join(result.error_messages))
@@ -48,9 +38,9 @@ class AnamneseService:
         if not anamnese.id:
             raise ValueError("Não é possível atualizar uma anamnese sem ID.")
 
-        errors = self.validate(anamnese)
-        if errors:
-            raise ValueError(" ; ".join(errors))
+        result = self.validate(anamnese)
+        if not result.success:
+            raise ValueError("; ".join(result.error_messages))
 
         self.repository.update(anamnese)
         logger.info(f"Anamnese atualizada com sucesso: ID={anamnese.id}")
@@ -65,9 +55,8 @@ class AnamneseService:
     def get_by_patient(self, patient_id: int) -> Optional[Anamnese]:
         return self.repository.get_by_patient(patient_id)
 
-    def get_history_by_patient(self, patient_id: int) -> List[Anamnese]:
+    def get_history_by_patient(self, patient_id: int):
         return self.repository.get_by_patient_history(patient_id)
 
     def has_anamnese(self, patient_id: int) -> bool:
-        anamnese = self.repository.get_by_patient(patient_id)
-        return anamnese is not None
+        return self.repository.get_by_patient(patient_id) is not None

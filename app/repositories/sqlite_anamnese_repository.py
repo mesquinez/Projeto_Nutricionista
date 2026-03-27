@@ -1,6 +1,5 @@
 import sqlite3
 from contextlib import contextmanager
-from datetime import date, datetime
 from pathlib import Path
 from typing import List, Optional
 
@@ -11,16 +10,25 @@ from .anamnese_repository import AnamneseRepository
 
 class SQLiteAnamneseRepository(AnamneseRepository):
     COLUMNS = [
-        "id", "patient_id", "date", "objetivo_principal",
-        "peso_maximo", "peso_minimo", "peso_desejado",
-        "atividade_fisica", "frequencia_atividade", "tempo_atividade",
-        "sono_qualidade", "sono_horas",
-        "habitos_alimentares", "refeicoes_dia", "horarios_refeicoes",
-        "preferencia_alimentar", "aversao_alimentar", "alergio_intolerancias",
-        "consumo_agua", "consumo_alcool", "consumo_cigarro",
-        "doencas_previas", "doencas_familiares", "medicamentos", "suplementacao",
-        "cirurgias", "internacoes", "ritmo_intestinal", "observacoes_gerais",
-        "created_at", "updated_at"
+        "id",
+        "patient_id",
+        "data",
+        "queixa_principal",
+        "objetivo",
+        "historico_saude",
+        "medicamentos",
+        "alergias",
+        "habitos_alimentares",
+        "ingestao_agua",
+        "rotina",
+        "sono",
+        "atividade_fisica",
+        "funcionamento_intestinal",
+        "alcool",
+        "tabagismo",
+        "observacoes",
+        "created_at",
+        "updated_at",
     ]
 
     def __init__(self, db_path: Path | str = "nutritionist.db"):
@@ -44,72 +52,82 @@ class SQLiteAnamneseRepository(AnamneseRepository):
                 CREATE TABLE IF NOT EXISTS anamneses (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     patient_id INTEGER NOT NULL,
-                    date TEXT NOT NULL,
-                    objetivo_principal TEXT DEFAULT '',
-                    peso_maximo REAL,
-                    peso_minimo REAL,
-                    peso_desejado REAL,
-                    atividade_fisica TEXT DEFAULT '',
-                    frequencia_atividade TEXT DEFAULT '',
-                    tempo_atividade TEXT DEFAULT '',
-                    sono_qualidade TEXT DEFAULT '',
-                    sono_horas TEXT DEFAULT '',
-                    habitos_alimentares TEXT DEFAULT '',
-                    refeicoes_dia INTEGER DEFAULT 0,
-                    horarios_refeicoes TEXT DEFAULT '',
-                    preferencia_alimentar TEXT DEFAULT '',
-                    aversao_alimentar TEXT DEFAULT '',
-                    alergio_intolerancias TEXT DEFAULT '',
-                    consumo_agua TEXT DEFAULT '',
-                    consumo_alcool TEXT DEFAULT '',
-                    consumo_cigarro TEXT DEFAULT '',
-                    doencas_previas TEXT DEFAULT '',
-                    doencas_familiares TEXT DEFAULT '',
+                    data TEXT NOT NULL,
+                    queixa_principal TEXT DEFAULT '',
+                    objetivo TEXT DEFAULT '',
+                    historico_saude TEXT DEFAULT '',
                     medicamentos TEXT DEFAULT '',
-                    suplementacao TEXT DEFAULT '',
-                    cirurgias TEXT DEFAULT '',
-                    internacoes TEXT DEFAULT '',
-                    ritmo_intestinal TEXT DEFAULT '',
-                    observacoes_gerais TEXT DEFAULT '',
+                    alergias TEXT DEFAULT '',
+                    habitos_alimentares TEXT DEFAULT '',
+                    ingestao_agua TEXT DEFAULT '',
+                    rotina TEXT DEFAULT '',
+                    sono TEXT DEFAULT '',
+                    atividade_fisica TEXT DEFAULT '',
+                    funcionamento_intestinal TEXT DEFAULT '',
+                    alcool TEXT DEFAULT '',
+                    tabagismo TEXT DEFAULT '',
+                    observacoes TEXT DEFAULT '',
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                     updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE
                 )
                 """
             )
+            self._migrate_schema(cursor)
             conn.commit()
+
+    def _migrate_schema(self, cursor: sqlite3.Cursor):
+        cursor.execute("PRAGMA table_info(anamneses)")
+        columns = [row[1] for row in cursor.fetchall()]
+
+        needed = [
+            ("data", "TEXT"),
+            ("queixa_principal", "TEXT DEFAULT ''"),
+            ("objetivo", "TEXT DEFAULT ''"),
+            ("historico_saude", "TEXT DEFAULT ''"),
+            ("alergias", "TEXT DEFAULT ''"),
+            ("ingestao_agua", "TEXT DEFAULT ''"),
+            ("rotina", "TEXT DEFAULT ''"),
+            ("sono", "TEXT DEFAULT ''"),
+            ("funcionamento_intestinal", "TEXT DEFAULT ''"),
+            ("alcool", "TEXT DEFAULT ''"),
+            ("tabagismo", "TEXT DEFAULT ''"),
+            ("observacoes", "TEXT DEFAULT ''"),
+        ]
+
+        for col_name, col_type in needed:
+            if col_name not in columns:
+                cursor.execute(f"ALTER TABLE anamneses ADD COLUMN {col_name} {col_type}")
+                logger.info(f"Coluna {col_name} adicionada à tabela anamneses")
+
+        if "date" in columns:
+            cursor.execute(
+                """
+                UPDATE anamneses
+                SET data = COALESCE(data, date)
+                WHERE data IS NULL OR data = ''
+                """
+            )
 
     def _row_to_anamnese(self, row: sqlite3.Row) -> Anamnese:
         return Anamnese(
             id=row["id"],
             patient_id=row["patient_id"],
-            date=row["date"],
-            objetivo_principal=row["objetivo_principal"],
-            peso_maximo=row["peso_maximo"],
-            peso_minimo=row["peso_minimo"],
-            peso_desejado=row["peso_desejado"],
-            atividade_fisica=row["atividade_fisica"],
-            frequencia_atividade=row["frequencia_atividade"],
-            tempo_atividade=row["tempo_atividade"],
-            sono_qualidade=row["sono_qualidade"],
-            sono_horas=row["sono_horas"],
-            habitos_alimentares=row["habitos_alimentares"],
-            refeicoes_dia=row["refeicoes_dia"],
-            horarios_refeicoes=row["horarios_refeicoes"],
-            preferencia_alimentar=row["preferencia_alimentar"],
-            aversao_alimentar=row["aversao_alimentar"],
-            alergio_intolerancias=row["alergio_intolerancias"],
-            consumo_agua=row["consumo_agua"],
-            consumo_alcool=row["consumo_alcool"],
-            consumo_cigarro=row["consumo_cigarro"],
-            doencas_previas=row["doencas_previas"],
-            doencas_familiares=row["doencas_familiares"],
+            data=row["data"],
+            queixa_principal=row["queixa_principal"],
+            objetivo=row["objetivo"],
+            historico_saude=row["historico_saude"],
             medicamentos=row["medicamentos"],
-            suplementacao=row["suplementacao"],
-            cirurgias=row["cirurgias"],
-            internacoes=row["internacoes"],
-            ritmo_intestinal=row["ritmo_intestinal"],
-            observacoes_gerais=row["observacoes_gerais"],
+            alergias=row["alergias"],
+            habitos_alimentares=row["habitos_alimentares"],
+            ingestao_agua=row["ingestao_agua"],
+            rotina=row["rotina"],
+            sono=row["sono"],
+            atividade_fisica=row["atividade_fisica"],
+            funcionamento_intestinal=row["funcionamento_intestinal"],
+            alcool=row["alcool"],
+            tabagismo=row["tabagismo"],
+            observacoes=row["observacoes"],
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )
@@ -117,33 +135,21 @@ class SQLiteAnamneseRepository(AnamneseRepository):
     def _get_fields(self, anamnese: Anamnese) -> dict:
         return {
             "patient_id": anamnese.patient_id,
-            "date": anamnese.date.isoformat() if anamnese.date else None,
-            "objetivo_principal": anamnese.objetivo_principal,
-            "peso_maximo": anamnese.peso_maximo,
-            "peso_minimo": anamnese.peso_minimo,
-            "peso_desejado": anamnese.peso_desejado,
-            "atividade_fisica": anamnese.atividade_fisica,
-            "frequencia_atividade": anamnese.frequencia_atividade,
-            "tempo_atividade": anamnese.tempo_atividade,
-            "sono_qualidade": anamnese.sono_qualidade,
-            "sono_horas": anamnese.sono_horas,
-            "habitos_alimentares": anamnese.habitos_alimentares,
-            "refeicoes_dia": anamnese.refeicoes_dia,
-            "horarios_refeicoes": anamnese.horarios_refeicoes,
-            "preferencia_alimentar": anamnese.preferencia_alimentar,
-            "aversao_alimentar": anamnese.aversao_alimentar,
-            "alergio_intolerancias": anamnese.alergio_intolerancias,
-            "consumo_agua": anamnese.consumo_agua,
-            "consumo_alcool": anamnese.consumo_alcool,
-            "consumo_cigarro": anamnese.consumo_cigarro,
-            "doencas_previas": anamnese.doencas_previas,
-            "doencas_familiares": anamnese.doencas_familiares,
+            "data": anamnese.data.isoformat() if anamnese.data else None,
+            "queixa_principal": anamnese.queixa_principal,
+            "objetivo": anamnese.objetivo,
+            "historico_saude": anamnese.historico_saude,
             "medicamentos": anamnese.medicamentos,
-            "suplementacao": anamnese.suplementacao,
-            "cirurgias": anamnese.cirurgias,
-            "internacoes": anamnese.internacoes,
-            "ritmo_intestinal": anamnese.ritmo_intestinal,
-            "observacoes_gerais": anamnese.observacoes_gerais,
+            "alergias": anamnese.alergias,
+            "habitos_alimentares": anamnese.habitos_alimentares,
+            "ingestao_agua": anamnese.ingestao_agua,
+            "rotina": anamnese.rotina,
+            "sono": anamnese.sono,
+            "atividade_fisica": anamnese.atividade_fisica,
+            "funcionamento_intestinal": anamnese.funcionamento_intestinal,
+            "alcool": anamnese.alcool,
+            "tabagismo": anamnese.tabagismo,
+            "observacoes": anamnese.observacoes,
         }
 
     def add(self, anamnese: Anamnese) -> int:
@@ -203,7 +209,7 @@ class SQLiteAnamneseRepository(AnamneseRepository):
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT * FROM anamneses WHERE patient_id = ? ORDER BY date DESC LIMIT 1",
+                "SELECT * FROM anamneses WHERE patient_id = ? ORDER BY data DESC, id DESC LIMIT 1",
                 (patient_id,)
             )
             row = cursor.fetchone()
@@ -213,7 +219,7 @@ class SQLiteAnamneseRepository(AnamneseRepository):
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT * FROM anamneses WHERE patient_id = ? ORDER BY date DESC",
+                "SELECT * FROM anamneses WHERE patient_id = ? ORDER BY data DESC, id DESC",
                 (patient_id,)
             )
             rows = cursor.fetchall()

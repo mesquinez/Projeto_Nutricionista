@@ -23,9 +23,9 @@ def format_date_br(text: str) -> str:
     if len(raw) > 8:
         raw = raw[:8]
     parts = []
-    if len(raw) >= 2:
+    if len(raw) >= 1:
         parts.append(raw[:2])
-    if len(raw) >= 4:
+    if len(raw) >= 3:
         parts.append(raw[2:4])
     if len(raw) > 4:
         parts.append(raw[4:])

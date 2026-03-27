@@ -61,7 +61,7 @@ class MainWindow:
         ttk.Button(toolbar_frame, text="Excluir", command=self._delete_patient).pack(side=tk.LEFT, padx=2)
         ttk.Separator(toolbar_frame, orient=tk.VERTICAL).pack(side=tk.LEFT, padx=5, fill=tk.Y)
         ttk.Button(toolbar_frame, text="Prontuário", command=self._open_patient_detail).pack(side=tk.LEFT, padx=2)
-        ttk.Button(toolbar_frame, text="Anamnese", command=self._open_anamnese).pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar_frame, text="Nova Anamnese", command=self._open_anamnese).pack(side=tk.LEFT, padx=2)
         ttk.Separator(toolbar_frame, orient=tk.VERTICAL).pack(side=tk.LEFT, padx=5, fill=tk.Y)
         ttk.Button(toolbar_frame, text="Atualizar", command=self._load_patients).pack(side=tk.LEFT, padx=2)
 
@@ -223,6 +223,8 @@ class MainWindow:
         )
 
     def _open_anamnese_for_patient(self, patient):
+        patients = self.patient_controller.get_all_patients()
+
         def on_save(anamnese):
             try:
                 self.anamnese_controller.create_anamnese(anamnese)
@@ -234,21 +236,18 @@ class MainWindow:
                 return False
 
         from .anamnese_window import AnamneseWindow
-        AnamneseWindow(self.root, patient=patient, on_save=on_save)
+        AnamneseWindow(self.root, patient=patient, patients=patients, on_save=on_save)
 
     def _open_anamnese(self):
         patient = self._get_selected_patient()
         if patient is None:
             return
 
-        existing = self.anamnese_controller.get_patient_anamnese(patient.id)
+        patients = self.patient_controller.get_all_patients()
 
         def on_save(anamnese):
             try:
-                if existing:
-                    self.anamnese_controller.update_anamnese(anamnese)
-                else:
-                    self.anamnese_controller.create_anamnese(anamnese)
+                self.anamnese_controller.create_anamnese(anamnese)
                 self._load_patients()
                 messagebox.showinfo("Sucesso", "Anamnese salva!")
                 return True
@@ -257,7 +256,7 @@ class MainWindow:
                 return False
 
         from .anamnese_window import AnamneseWindow
-        AnamneseWindow(self.root, patient=patient, anamnese=existing, on_save=on_save)
+        AnamneseWindow(self.root, patient=patient, patients=patients, on_save=on_save)
 
     def run(self):
         self.root.mainloop()

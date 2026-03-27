@@ -1,15 +1,17 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
 from datetime import date
-from typing import Optional, Callable, TYPE_CHECKING
+from tkinter import messagebox, ttk
+from typing import TYPE_CHECKING, Callable, Optional
+
+from app.ui.utils.formatters import format_date_br
 
 if TYPE_CHECKING:
-    from ..models.patient import Patient
     from ..models.anamnese import Anamnese
-    from ..controllers.anamnese_controller import AnamneseController
+    from ..models.patient import Patient
 
 try:
     from tkcalendar import DateEntry
+
     HAS_TKCALENDAR = True
 except ImportError:
     HAS_TKCALENDAR = False
@@ -19,18 +21,22 @@ class AnamneseWindow(tk.Toplevel):
     def __init__(
         self,
         parent,
-        patient: "Patient",
+        patient: Optional["Patient"] = None,
+        patients: Optional[list["Patient"]] = None,
         anamnese: Optional["Anamnese"] = None,
         on_save: Optional[Callable] = None,
     ):
         super().__init__(parent)
         self.patient = patient
+        self.patients = patients or ([patient] if patient else [])
         self.anamnese = anamnese
         self.on_save = on_save
         self.result = None
+        self.selected_patient = patient
+        self.patient_options = {}
 
-        self.title("Anamnese Nutricional" if not anamnese else "Editar Anamnese")
-        self.geometry("750x700")
+        self.title("Anamnese" if not anamnese else "Editar Anamnese")
+        self.geometry("760x760")
         self.resizable(True, True)
         self.transient(parent)
         self.grab_set()
@@ -40,296 +46,194 @@ class AnamneseWindow(tk.Toplevel):
             self._load_anamnese_data()
 
     def _create_widgets(self):
-        main_canvas = tk.Canvas(self)
-        scrollbar = ttk.Scrollbar(self, orient="vertical", command=main_canvas.yview)
-        scrollable_frame = ttk.Frame(main_canvas, padding="10")
+        container = ttk.Frame(self, padding=16)
+        container.pack(fill=tk.BOTH, expand=True)
+        container.columnconfigure(1, weight=1)
 
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: main_canvas.configure(scrollregion=main_canvas.bbox("all"))
-        )
-        main_canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        main_canvas.configure(yscrollcommand=scrollbar.set)
+        ttk.Label(container, text="Paciente:").grid(row=0, column=0, sticky="nw", pady=4, padx=(0, 10))
+        self.patient_var = tk.StringVar()
+        self.patient_combo = ttk.Combobox(container, textvariable=self.patient_var, state="readonly")
+        self.patient_combo.grid(row=0, column=1, sticky="ew", pady=4)
+        self.patient_combo.bind("<<ComboboxSelected>>", self._on_patient_selected)
 
-        main_canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
+        resumo_frame = ttk.LabelFrame(container, text="Resumo do Paciente", padding=10)
+        resumo_frame.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(8, 12))
+        resumo_frame.columnconfigure(1, weight=1)
 
-        row = 0
-        self._create_section_title(scrollable_frame, "OBJETIVO PRINCIPAL", row)
-        row += 1
-        self.objetivo_entry = ttk.Entry(scrollable_frame, width=80)
-        self.objetivo_entry.grid(row=row, column=0, columnspan=2, sticky="ew", pady=2)
-        self.objetivo_entry.bind("<Return>", lambda e: self._save())
-        row += 1
+        ttk.Label(resumo_frame, text="Nome:").grid(row=0, column=0, sticky="w", padx=(0, 10), pady=2)
+        self.patient_name_value = ttk.Label(resumo_frame, text="-")
+        self.patient_name_value.grid(row=0, column=1, sticky="w", pady=2)
 
-        self._create_section_title(scrollable_frame, "HISTÓRICO DE PESO", row)
-        row += 1
-        ttk.Label(scrollable_frame, text="Peso máximo (kg):").grid(row=row, column=0, sticky="w", pady=2)
-        self.peso_max_entry = ttk.Entry(scrollable_frame, width=20)
-        self.peso_max_entry.grid(row=row, column=1, sticky="w", pady=2)
-        self.peso_max_entry.bind("<Return>", lambda e: self._save())
-        row += 1
-        ttk.Label(scrollable_frame, text="Peso mínimo (kg):").grid(row=row, column=0, sticky="w", pady=2)
-        self.peso_min_entry = ttk.Entry(scrollable_frame, width=20)
-        self.peso_min_entry.grid(row=row, column=1, sticky="w", pady=2)
-        self.peso_min_entry.bind("<Return>", lambda e: self._save())
-        row += 1
-        ttk.Label(scrollable_frame, text="Peso desejado (kg):").grid(row=row, column=0, sticky="w", pady=2)
-        self.peso_desejado_entry = ttk.Entry(scrollable_frame, width=20)
-        self.peso_desejado_entry.grid(row=row, column=1, sticky="w", pady=2)
-        self.peso_desejado_entry.bind("<Return>", lambda e: self._save())
-        row += 1
+        ttk.Label(resumo_frame, text="Data de nascimento:").grid(row=1, column=0, sticky="w", padx=(0, 10), pady=2)
+        self.patient_birth_value = ttk.Label(resumo_frame, text="-")
+        self.patient_birth_value.grid(row=1, column=1, sticky="w", pady=2)
 
-        self._create_section_title(scrollable_frame, "ATIVIDADE FÍSICA", row)
-        row += 1
-        ttk.Label(scrollable_frame, text="Pratica atividade física?").grid(row=row, column=0, sticky="w", pady=2)
-        self.atividade_entry = ttk.Entry(scrollable_frame, width=60)
-        self.atividade_entry.grid(row=row, column=1, sticky="w", pady=2)
-        self.atividade_entry.bind("<Return>", lambda e: self._save())
-        row += 1
-        ttk.Label(scrollable_frame, text="Frequência:").grid(row=row, column=0, sticky="w", pady=2)
-        self.frequencia_entry = ttk.Entry(scrollable_frame, width=60)
-        self.frequencia_entry.grid(row=row, column=1, sticky="w", pady=2)
-        self.frequencia_entry.bind("<Return>", lambda e: self._save())
-        row += 1
-        ttk.Label(scrollable_frame, text="Duração por sessão:").grid(row=row, column=0, sticky="w", pady=2)
-        self.tempo_entry = ttk.Entry(scrollable_frame, width=60)
-        self.tempo_entry.grid(row=row, column=1, sticky="w", pady=2)
-        self.tempo_entry.bind("<Return>", lambda e: self._save())
-        row += 1
+        ttk.Label(resumo_frame, text="Telefone:").grid(row=2, column=0, sticky="w", padx=(0, 10), pady=2)
+        self.patient_phone_value = ttk.Label(resumo_frame, text="-")
+        self.patient_phone_value.grid(row=2, column=1, sticky="w", pady=2)
 
-        self._create_section_title(scrollable_frame, "SONO", row)
-        row += 1
-        ttk.Label(scrollable_frame, text="Qualidade do sono:").grid(row=row, column=0, sticky="w", pady=2)
-        self.sono_qualidade_entry = ttk.Combobox(
-            scrollable_frame, width=58,
-            values=["Bom", "Regular", "Ruim", "Insônia"],
-            state="readonly"
-        )
-        self.sono_qualidade_entry.grid(row=row, column=1, sticky="w", pady=2)
-        row += 1
-        ttk.Label(scrollable_frame, text="Horas de sono por noite:").grid(row=row, column=0, sticky="w", pady=2)
-        self.sono_horas_entry = ttk.Combobox(
-            scrollable_frame, width=58,
-            values=["Menos de 5h", "5-6h", "6-7h", "7-8h", "Mais de 8h"],
-            state="readonly"
-        )
-        self.sono_horas_entry.grid(row=row, column=1, sticky="w", pady=2)
-        row += 1
+        ttk.Label(resumo_frame, text="Status:").grid(row=3, column=0, sticky="w", padx=(0, 10), pady=2)
+        self.patient_status_value = ttk.Label(resumo_frame, text="-")
+        self.patient_status_value.grid(row=3, column=1, sticky="w", pady=2)
 
-        self._create_section_title(scrollable_frame, "HÁBITOS ALIMENTARES", row)
-        row += 1
-        ttk.Label(scrollable_frame, text="Descreva seus hábitos alimentares:").grid(row=row, column=0, sticky="w", pady=2)
-        row += 1
-        self.habitos_text = tk.Text(scrollable_frame, width=60, height=3)
-        self.habitos_text.grid(row=row, column=0, columnspan=2, sticky="ew", pady=2)
-        row += 1
-        ttk.Label(scrollable_frame, text="Refeições por dia:").grid(row=row, column=0, sticky="w", pady=2)
-        self.refeicoes_combo = ttk.Combobox(
-            scrollable_frame, width=58,
-            values=["1", "2", "3", "4", "5", "6 ou mais"],
-            state="readonly"
-        )
-        self.refeicoes_combo.grid(row=row, column=1, sticky="w", pady=2)
-        row += 1
-        ttk.Label(scrollable_frame, text="Horários das refeições:").grid(row=row, column=0, sticky="w", pady=2)
-        self.horarios_entry = ttk.Entry(scrollable_frame, width=60)
-        self.horarios_entry.grid(row=row, column=1, sticky="w", pady=2)
-        self.horarios_entry.bind("<Return>", lambda e: self._save())
-        row += 1
+        self._load_patient_options()
 
-        self._create_section_title(scrollable_frame, "PREFERÊNCIAS ALIMENTARES", row)
-        row += 1
-        ttk.Label(scrollable_frame, text="Alimentos preferidos:").grid(row=row, column=0, sticky="w", pady=2)
-        self.preferencias_entry = ttk.Entry(scrollable_frame, width=60)
-        self.preferencias_entry.grid(row=row, column=1, sticky="w", pady=2)
-        self.preferencias_entry.bind("<Return>", lambda e: self._save())
-        row += 1
-        ttk.Label(scrollable_frame, text="Alimentos que não gosta:").grid(row=row, column=0, sticky="w", pady=2)
-        self.aversoes_entry = ttk.Entry(scrollable_frame, width=60)
-        self.aversoes_entry.grid(row=row, column=1, sticky="w", pady=2)
-        self.aversoes_entry.bind("<Return>", lambda e: self._save())
-        row += 1
-        ttk.Label(scrollable_frame, text="Alergias/Intolerâncias:").grid(row=row, column=0, sticky="w", pady=2)
-        self.alergias_entry = ttk.Entry(scrollable_frame, width=60)
-        self.alergias_entry.grid(row=row, column=1, sticky="w", pady=2)
-        self.alergias_entry.bind("<Return>", lambda e: self._save())
-        row += 1
+        ttk.Label(container, text="Data:").grid(row=2, column=0, sticky="nw", pady=4, padx=(0, 10))
+        if HAS_TKCALENDAR:
+            self.data_picker = DateEntry(container, width=18, date_pattern="dd/mm/yyyy")
+            self.data_picker.grid(row=2, column=1, sticky="w", pady=4)
+        else:
+            self.data_entry = ttk.Entry(container, width=20)
+            self.data_entry.grid(row=2, column=1, sticky="w", pady=4)
+            self.data_entry.bind("<KeyRelease>", self._on_date_change)
 
-        self._create_section_title(scrollable_frame, "INGESTÃO DE LÍQUIDOS", row)
-        row += 1
-        ttk.Label(scrollable_frame, text="Consumo de água diário:").grid(row=row, column=0, sticky="w", pady=2)
-        self.agua_entry = ttk.Combobox(
-            scrollable_frame, width=58,
-            values=["Menos de 1L", "1-2L", "2-3L", "Mais de 3L"],
-            state="readonly"
-        )
-        self.agua_entry.grid(row=row, column=1, sticky="w", pady=2)
-        row += 1
-        ttk.Label(scrollable_frame, text="Consumo de álcool:").grid(row=row, column=0, sticky="w", pady=2)
-        self.alcool_entry = ttk.Combobox(
-            scrollable_frame, width=58,
-            values=["Não bebe", "Ocasionalmente", "Fins de semana", "Diariamente"],
-            state="readonly"
-        )
-        self.alcool_entry.grid(row=row, column=1, sticky="w", pady=2)
-        row += 1
-        ttk.Label(scrollable_frame, text="Consumo de cigarro:").grid(row=row, column=0, sticky="w", pady=2)
-        self.cigarro_entry = ttk.Combobox(
-            scrollable_frame, width=58,
-            values=["Não fuma", "Menos de 5/dia", "5-10/dia", "Mais de 10/dia"],
-            state="readonly"
-        )
-        self.cigarro_entry.grid(row=row, column=1, sticky="w", pady=2)
-        row += 1
+        self.text_fields = {}
+        fields = [
+            ("queixa_principal", "Queixa principal:", 4),
+            ("objetivo", "Objetivo:", 4),
+            ("historico_saude", "Histórico de saúde:", 4),
+            ("medicamentos", "Medicamentos:", 3),
+            ("alergias", "Alergias:", 3),
+            ("habitos_alimentares", "Hábitos alimentares:", 4),
+            ("ingestao_agua", "Ingestão de água:", 3),
+            ("rotina", "Rotina:", 4),
+            ("sono", "Sono:", 3),
+            ("atividade_fisica", "Atividade física:", 3),
+            ("funcionamento_intestinal", "Funcionamento intestinal:", 3),
+            ("alcool", "Álcool:", 3),
+            ("tabagismo", "Tabagismo:", 3),
+            ("observacoes", "Observações:", 4),
+        ]
 
-        self._create_section_title(scrollable_frame, "HISTÓRICO DE SAÚDE", row)
-        row += 1
-        ttk.Label(scrollable_frame, text="Doenças prévias:").grid(row=row, column=0, sticky="w", pady=2)
-        self.doencas_prev_entry = ttk.Entry(scrollable_frame, width=60)
-        self.doencas_prev_entry.grid(row=row, column=1, sticky="w", pady=2)
-        row += 1
-        ttk.Label(scrollable_frame, text="Doenças familiares:").grid(row=row, column=0, sticky="w", pady=2)
-        self.doencas_fam_entry = ttk.Entry(scrollable_frame, width=60)
-        self.doencas_fam_entry.grid(row=row, column=1, sticky="w", pady=2)
-        row += 1
-        ttk.Label(scrollable_frame, text="Medicamentos em uso:").grid(row=row, column=0, sticky="w", pady=2)
-        self.medicamentos_entry = ttk.Entry(scrollable_frame, width=60)
-        self.medicamentos_entry.grid(row=row, column=1, sticky="w", pady=2)
-        row += 1
-        ttk.Label(scrollable_frame, text="Suplementação:").grid(row=row, column=0, sticky="w", pady=2)
-        self.suplementacao_entry = ttk.Entry(scrollable_frame, width=60)
-        self.suplementacao_entry.grid(row=row, column=1, sticky="w", pady=2)
-        row += 1
-        ttk.Label(scrollable_frame, text="Cirurgias realizadas:").grid(row=row, column=0, sticky="w", pady=2)
-        self.cirurgias_entry = ttk.Entry(scrollable_frame, width=60)
-        self.cirurgias_entry.grid(row=row, column=1, sticky="w", pady=2)
-        row += 1
-        ttk.Label(scrollable_frame, text="Internações:").grid(row=row, column=0, sticky="w", pady=2)
-        self.internacoes_entry = ttk.Entry(scrollable_frame, width=60)
-        self.internacoes_entry.grid(row=row, column=1, sticky="w", pady=2)
-        row += 1
+        row = 3
+        for field_name, label, height in fields:
+            ttk.Label(container, text=label).grid(row=row, column=0, sticky="nw", pady=4, padx=(0, 10))
+            text = tk.Text(container, height=height, wrap="word")
+            text.grid(row=row, column=1, sticky="nsew", pady=4)
+            container.rowconfigure(row, weight=1)
+            self.text_fields[field_name] = text
+            row += 1
 
-        self._create_section_title(scrollable_frame, "FUNÇÕES BIOLÓGICAS", row)
-        row += 1
-        ttk.Label(scrollable_frame, text="Ritmo intestinal:").grid(row=row, column=0, sticky="w", pady=2)
-        self.ritmo_entry = ttk.Combobox(
-            scrollable_frame, width=58,
-            values=["Regular", "Irregular", "Constipação", "Diarreia"],
-            state="readonly"
-        )
-        self.ritmo_entry.grid(row=row, column=1, sticky="w", pady=2)
-        row += 1
-
-        self._create_section_title(scrollable_frame, "OBSERVAÇÕES", row)
-        row += 1
-        self.observacoes_text = tk.Text(scrollable_frame, width=60, height=4)
-        self.observacoes_text.grid(row=row, column=0, columnspan=2, sticky="ew", pady=2)
-        row += 1
-
-        button_frame = ttk.Frame(scrollable_frame)
-        button_frame.grid(row=row, column=0, columnspan=2, pady=20)
+        button_frame = ttk.Frame(container)
+        button_frame.grid(row=row, column=0, columnspan=2, sticky="e", pady=(12, 0))
         ttk.Button(button_frame, text="Salvar", command=self._save).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Cancelar", command=self.destroy).pack(side=tk.LEFT, padx=5)
 
-        self.objetivo_entry.focus_set()
+        self.patient_combo.focus_set()
 
-    def _create_section_title(self, parent, title: str, row: int):
-        ttk.Separator(parent, orient="horizontal").grid(
-            row=row, column=0, columnspan=2, sticky="ew", pady=(10, 5)
-        )
-        ttk.Label(parent, text=title, font=("TkDefaultFont", 10, "bold")).grid(
-            row=row, column=0, columnspan=2, sticky="w", pady=(5, 2)
-        )
+    def _load_patient_options(self):
+        values = []
+        for patient in self.patients:
+            if not patient or patient.id is None:
+                continue
+            label = f"{patient.id} - {patient.name}"
+            self.patient_options[label] = patient
+            values.append(label)
+
+        self.patient_combo["values"] = values
+
+        if self.patient and self.patient.id is not None:
+            selected_label = f"{self.patient.id} - {self.patient.name}"
+            if selected_label in self.patient_options:
+                self.patient_var.set(selected_label)
+                self.selected_patient = self.patient_options[selected_label]
+        elif values:
+            self.patient_var.set(values[0])
+            self.selected_patient = self.patient_options[values[0]]
+
+        self._update_patient_summary()
+
+    def _on_patient_selected(self, _event=None):
+        self.selected_patient = self.patient_options.get(self.patient_var.get())
+        self._update_patient_summary()
+
+    def _update_patient_summary(self):
+        patient = self.selected_patient
+        if not patient:
+            self.patient_name_value.config(text="-")
+            self.patient_birth_value.config(text="-")
+            self.patient_phone_value.config(text="-")
+            self.patient_status_value.config(text="-")
+            return
+
+        birth_date = patient.birth_date.strftime("%d/%m/%Y") if patient.birth_date else "-"
+        self.patient_name_value.config(text=patient.name or "-")
+        self.patient_birth_value.config(text=birth_date)
+        self.patient_phone_value.config(text=patient.phone or "-")
+        self.patient_status_value.config(text=patient.status or "-")
 
     def _load_anamnese_data(self):
-        a = self.anamnese
-        self.objetivo_entry.insert(0, a.objetivo_principal or "")
-        self.peso_max_entry.insert(0, str(a.peso_maximo) if a.peso_maximo else "")
-        self.peso_min_entry.insert(0, str(a.peso_minimo) if a.peso_minimo else "")
-        self.peso_desejado_entry.insert(0, str(a.peso_desejado) if a.peso_desejado else "")
-        self.atividade_entry.insert(0, a.atividade_fisica or "")
-        self.frequencia_entry.insert(0, a.frequencia_atividade or "")
-        self.tempo_entry.insert(0, a.tempo_atividade or "")
-        self._set_combo(self.sono_qualidade_entry, a.sono_qualidade)
-        self._set_combo(self.sono_horas_entry, a.sono_horas)
-        self.habitos_text.insert("1.0", a.habitos_alimentares or "")
-        self._set_combo(self.refeicoes_combo, str(a.refeicoes_dia) if a.refeicoes_dia else "")
-        self.horarios_entry.insert(0, a.horarios_refeicoes or "")
-        self.preferencias_entry.insert(0, a.preferencia_alimentar or "")
-        self.aversoes_entry.insert(0, a.aversao_alimentar or "")
-        self.alergias_entry.insert(0, a.alergio_intolerancias or "")
-        self._set_combo(self.agua_entry, a.consumo_agua)
-        self._set_combo(self.alcool_entry, a.consumo_alcool)
-        self._set_combo(self.cigarro_entry, a.consumo_cigarro)
-        self.doencas_prev_entry.insert(0, a.doencas_previas or "")
-        self.doencas_fam_entry.insert(0, a.doencas_familiares or "")
-        self.medicamentos_entry.insert(0, a.medicamentos or "")
-        self.suplementacao_entry.insert(0, a.suplementacao or "")
-        self.cirurgias_entry.insert(0, a.cirurgias or "")
-        self.internacoes_entry.insert(0, a.internacoes or "")
-        self._set_combo(self.ritmo_entry, a.ritmo_intestinal)
-        self.observacoes_text.insert("1.0", a.observacoes_gerais or "")
+        anamnese = self.anamnese
+        if HAS_TKCALENDAR:
+            self.data_picker.set_date(anamnese.data)
+        else:
+            self.data_entry.insert(0, anamnese.data.strftime("%d/%m/%Y"))
 
-    def _set_combo(self, combo: ttk.Combobox, value: str):
-        if value:
-            combo.set(value)
+        for field_name, widget in self.text_fields.items():
+            widget.insert("1.0", getattr(anamnese, field_name, "") or "")
 
+    def _on_date_change(self, _event=None):
+        if HAS_TKCALENDAR:
+            return
 
+        formatted = format_date_br(self.data_entry.get())
+        current_pos = self.data_entry.index(tk.INSERT)
+        self.data_entry.delete(0, tk.END)
+        self.data_entry.insert(0, formatted)
+        self.data_entry.icursor(current_pos)
+
+    def _get_data(self) -> date:
+        if HAS_TKCALENDAR:
+            value = self.data_picker.get_date()
+            return value if isinstance(value, date) else date.today()
+
+        raw = self.data_entry.get().strip()
+        if not raw:
+            return None
+        try:
+            day, month, year = raw.split("/")
+            return date(int(year), int(month), int(day))
+        except Exception:
+            return None
 
     def _save(self):
         from ..models.anamnese import Anamnese
-        from ..utils.validators import is_valid_number
-        
-        errors = []
-        if not is_valid_number(self.peso_max_entry.get().strip()):
-            errors.append("Peso Máximo deve ser um número.")
-        if not is_valid_number(self.peso_min_entry.get().strip()):
-            errors.append("Peso Mínimo deve ser um número.")
-        if not is_valid_number(self.peso_desejado_entry.get().strip()):
-            errors.append("Peso Desejado deve ser um número.")
-            
-        if errors:
-            messagebox.showerror("Erro de Formato", "\n".join(errors))
+
+        selected_patient = self.selected_patient or self.patient_options.get(self.patient_var.get())
+        if not selected_patient:
+            messagebox.showerror("Erro", "Selecione um paciente.")
+            return
+
+        data_value = self._get_data()
+        if not data_value:
+            messagebox.showerror("Erro", "Data inválida. Use DD/MM/AAAA.")
             return
 
         anamnese = Anamnese(
             id=self.anamnese.id if self.anamnese else None,
-            patient_id=self.patient.id,
-            date=self.anamnese.date if self.anamnese else date.today(),
-            objetivo_principal=self.objetivo_entry.get().strip(),
-            peso_maximo=self.peso_max_entry.get().strip() or None,
-            peso_minimo=self.peso_min_entry.get().strip() or None,
-            peso_desejado=self.peso_desejado_entry.get().strip() or None,
-            atividade_fisica=self.atividade_entry.get().strip(),
-            frequencia_atividade=self.frequencia_entry.get().strip(),
-            tempo_atividade=self.tempo_entry.get().strip(),
-            sono_qualidade=self.sono_qualidade_entry.get().strip(),
-            sono_horas=self.sono_horas_entry.get().strip(),
-            habitos_alimentares=self.habitos_text.get("1.0", tk.END).strip(),
-            refeicoes_dia=self.refeicoes_combo.get().strip() or None,
-            horarios_refeicoes=self.horarios_entry.get().strip(),
-            preferencia_alimentar=self.preferencias_entry.get().strip(),
-            aversao_alimentar=self.aversoes_entry.get().strip(),
-            alergio_intolerancias=self.alergias_entry.get().strip(),
-            consumo_agua=self.agua_entry.get().strip(),
-            consumo_alcool=self.alcool_entry.get().strip(),
-            consumo_cigarro=self.cigarro_entry.get().strip(),
-            doencas_previas=self.doencas_prev_entry.get().strip(),
-            doencas_familiares=self.doencas_fam_entry.get().strip(),
-            medicamentos=self.medicamentos_entry.get().strip(),
-            suplementacao=self.suplementacao_entry.get().strip(),
-            cirurgias=self.cirurgias_entry.get().strip(),
-            internacoes=self.internacoes_entry.get().strip(),
-            ritmo_intestinal=self.ritmo_entry.get().strip(),
-            observacoes_gerais=self.observacoes_text.get("1.0", tk.END).strip(),
+            patient_id=selected_patient.id,
+            data=data_value,
+            queixa_principal=self.text_fields["queixa_principal"].get("1.0", tk.END).strip(),
+            objetivo=self.text_fields["objetivo"].get("1.0", tk.END).strip(),
+            historico_saude=self.text_fields["historico_saude"].get("1.0", tk.END).strip(),
+            medicamentos=self.text_fields["medicamentos"].get("1.0", tk.END).strip(),
+            alergias=self.text_fields["alergias"].get("1.0", tk.END).strip(),
+            habitos_alimentares=self.text_fields["habitos_alimentares"].get("1.0", tk.END).strip(),
+            ingestao_agua=self.text_fields["ingestao_agua"].get("1.0", tk.END).strip(),
+            rotina=self.text_fields["rotina"].get("1.0", tk.END).strip(),
+            sono=self.text_fields["sono"].get("1.0", tk.END).strip(),
+            atividade_fisica=self.text_fields["atividade_fisica"].get("1.0", tk.END).strip(),
+            funcionamento_intestinal=self.text_fields["funcionamento_intestinal"].get("1.0", tk.END).strip(),
+            alcool=self.text_fields["alcool"].get("1.0", tk.END).strip(),
+            tabagismo=self.text_fields["tabagismo"].get("1.0", tk.END).strip(),
+            observacoes=self.text_fields["observacoes"].get("1.0", tk.END).strip(),
         )
 
         self.result = anamnese
         if self.on_save:
             success = self.on_save(anamnese)
             if not success:
-                return # protect text fields
+                return
         self.destroy()
 
     def get_result(self) -> Optional["Anamnese"]:
