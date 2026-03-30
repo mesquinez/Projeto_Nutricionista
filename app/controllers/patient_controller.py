@@ -2,7 +2,7 @@ from typing import List, Optional
 
 from ..config import logger
 from ..models.patient import Patient
-from ..services.patient_service import PatientService
+from ..services.patient_service import PatientImportResult, PatientService
 
 
 class PatientController:
@@ -36,3 +36,10 @@ class PatientController:
         if not query or not query.strip():
             return self.get_all_patients()
         return self.service.search(query)
+
+    def import_patients_from_csv(self, file_path: str) -> PatientImportResult:
+        try:
+            return self.service.import_from_csv(file_path)
+        except ValueError as e:
+            logger.warning(f"Falha ao importar pacientes: {e}")
+            raise

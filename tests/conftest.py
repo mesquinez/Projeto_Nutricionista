@@ -10,6 +10,9 @@ os.environ.setdefault("TCL_LIBRARY", os.path.join(_PYTHON_BASE, "tcl", "tcl8.6")
 os.environ.setdefault("TK_LIBRARY", os.path.join(_PYTHON_BASE, "tcl", "tk8.6"))
 
 UI_TEST_FILES = {
+    "test_anamnese_window_ui.py",
+    "test_main_window_anamnese_ui.py",
+    "test_main_window_patient_import_ui.py",
     "test_patient_ui.py",
     "test_patient_ui_rapid.py",
     "test_patient_window_ui.py",

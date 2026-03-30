@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import filedialog, ttk, messagebox
 from datetime import date
 import re
 from typing import Optional, Callable, TYPE_CHECKING
@@ -49,6 +49,7 @@ class MainWindow:
         patient_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Pacientes", menu=patient_menu)
         patient_menu.add_command(label="Novo Paciente", command=self._add_patient)
+        patient_menu.add_command(label="Importar Planilha", command=self._import_patients)
         patient_menu.add_separator()
         patient_menu.add_command(label="Sair", command=self.root.quit)
 
@@ -57,6 +58,7 @@ class MainWindow:
         toolbar_frame.pack(fill=tk.X, padx=10, pady=10)
 
         ttk.Button(toolbar_frame, text="+ Novo", command=self._add_patient).pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar_frame, text="Importar Planilha", command=self._import_patients).pack(side=tk.LEFT, padx=2)
         ttk.Button(toolbar_frame, text="Editar", command=self._edit_patient).pack(side=tk.LEFT, padx=2)
         ttk.Button(toolbar_frame, text="Excluir", command=self._delete_patient).pack(side=tk.LEFT, padx=2)
         ttk.Separator(toolbar_frame, orient=tk.VERTICAL).pack(side=tk.LEFT, padx=5, fill=tk.Y)
@@ -192,6 +194,36 @@ class MainWindow:
 
         from .patient_window import PatientFormWindow
         PatientFormWindow(self.root, patient=patient, on_save=on_save)
+
+    def _import_patients(self):
+        file_path = filedialog.askopenfilename(
+            title="Selecionar planilha de pacientes",
+            filetypes=[("Arquivo CSV", "*.csv"), ("Todos os arquivos", "*.*")],
+        )
+        if not file_path:
+            return
+
+        try:
+            result = self.patient_controller.import_patients_from_csv(file_path)
+            self._load_patients()
+            summary = self._format_import_summary(result)
+            messagebox.showinfo("ImportaÃ§Ã£o de Pacientes", summary)
+        except Exception as e:
+            messagebox.showerror("Erro na ImportaÃ§Ã£o", str(e))
+
+    def _format_import_summary(self, result) -> str:
+        lines = [
+            f"Pacientes importados com sucesso: {result.success_count}",
+            f"Linhas com falha: {result.failure_count}",
+        ]
+
+        if result.errors:
+            lines.append("")
+            lines.append("Motivos das falhas:")
+            for error in result.errors:
+                lines.append(f"Linha {error.line_number}: {error.reason}")
+
+        return "\n".join(lines)
 
     def _delete_patient(self):
         patient_id = self._get_selected_patient_id()

@@ -1,0 +1,40 @@
+nome_completo,data_nascimento,telefone
+Mariana Silva,10/05/1990,(21)99999-8888
+Joao Costa,22/08/1985,(21)98888-7777
+Ana Paula Mendes,14/02/1994,(11)98765-4321
+Carlos Eduardo Lima,03/11/1981,(31)97654-3210
+Fernanda Rocha,29/07/1996,(41)96543-2109
+Ricardo Gomes,17/01/1978,(51)95432-1098
+Patricia Alves,25/09/1989,(61)94321-0987
+Luciana Duarte,08/12/1992,(71)93210-9876
+Bruno Martins,19/04/1987,(81)92109-8765
+Camila Freitas,30/06/1995,(85)91098-7654
+Diego Nunes,12/03/1983,(47)99988-7766
+Juliana Cardoso,27/10/1991,(48)98877-6655
+Rafael Barbosa,04/05/1986,(49)97766-5544
+Beatriz Pires,16/01/1998,(91)96655-4433
+Sergio Araujo,21/08/1979,(92)95544-3322
+Tatiane Melo,11/11/1988,(93)94433-2211
+Gustavo Rios,05/07/1993,(94)93322-1100
+Renata Castro,28/02/1984,(95)92211-0099
+Paulo Henrique Souza,13/09/1977,(96)91122-3344
+Larissa Farias,07/04/1997,(97)92345-6789
+Vinicius Teixeira,09/12/1990,(98)93456-7890
+Simone Ribeiro,18/06/1982,(99)94567-8901
+Andre Luiz Santos,23/03/1985,(11)95678-9012
+Priscila Azevedo,31/01/1994,(12)96789-0123
+Leandro Moreira,06/10/1980,(13)97890-1234
+Vanessa Moraes,15/05/1992,(14)98901-2345
+Felipe Rezende,24/08/1987,(15)99012-3456
+Daniela Tavares,02/02/1996,(16)90123-4567
+Roberto Falcao,20/07/1975,(17)91234-5678
+Monica Xavier,26/11/1983,(18)92345-6780
+Thiago Neves,01/09/1991,(19)93456-7801
+Aline Brito,12/12/1999,(27)94567-8012
+Eduardo Santana,14/03/1988,(28)95678-0123
+Claudia Moura,09/01/1986,(29)96789-1234
+,10/05/1990,(21)99999-8888
+Nome Curto,10/05/1990,21999998888
+Carla Sem Telefone,10/05/1990,
+Pedro Sem Data,,(31)97654-3210
+Renato Data Invalida,31/02/1990,(41)96543-2109
